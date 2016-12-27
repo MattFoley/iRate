@@ -33,6 +33,9 @@
 
 #import "iRate.h"
 
+#ifdef SW_MESSAGES
+    #import "CrawlMessagesKeyboardView.h"
+#endif
 
 #import <Availability.h>
 #if !__has_feature(objc_arc)
@@ -246,7 +249,9 @@ static NSString *const iRateMacAppStoreURLFormat = @"macappstore://itunes.apple.
 #define APP_CLASS NSApplication
 #endif
 
+#ifndef SW_MESSAGES
         _delegate = (id<iRateDelegate>)[[APP_CLASS sharedApplication] delegate];
+#endif
     }
     return _delegate;
 }
@@ -840,7 +845,12 @@ static NSString *const iRateMacAppStoreURLFormat = @"macappstore://itunes.apple.
 
 #if TARGET_OS_IPHONE
 
+#ifdef SW_MESSAGES
+        UIViewController *topController = [CrawlMessagesKeyboardView rootController];
+        self.useUIAlertControllerIfAvailable = true;
+#else
         UIViewController *topController = [UIApplication sharedApplication].delegate.window.rootViewController;
+#endif
         while (topController.presentedViewController)
         {
             topController = topController.presentedViewController;
@@ -878,6 +888,7 @@ static NSString *const iRateMacAppStoreURLFormat = @"macappstore://itunes.apple.
         }
         else
         {
+#ifndef SW_MESSAGES
             UIAlertView *alert = [[UIAlertView alloc] initWithTitle:self.messageTitle
                                                             message:message
                                                            delegate:(id<UIAlertViewDelegate>)self
@@ -896,6 +907,7 @@ static NSString *const iRateMacAppStoreURLFormat = @"macappstore://itunes.apple.
 
             self.visibleAlert = alert;
             [self.visibleAlert show];
+#endif
         }
 
 #else
@@ -1016,6 +1028,7 @@ static NSString *const iRateMacAppStoreURLFormat = @"macappstore://itunes.apple.
 
 - (void)applicationWillEnterForeground
 {
+#ifndef SW_MESSAGES
     if ([UIApplication sharedApplication].applicationState == UIApplicationStateBackground)
     {
         [self incrementUseCount];
@@ -1025,6 +1038,7 @@ static NSString *const iRateMacAppStoreURLFormat = @"macappstore://itunes.apple.
             [self promptIfAllCriteriaMet];
         }
     }
+#endif
 }
 
 - (void)openRatingsPageInAppStore
@@ -1071,8 +1085,11 @@ static NSString *const iRateMacAppStoreURLFormat = @"macappstore://itunes.apple.
         {
             NSLog(@"iRate will open the App Store ratings page using the following URL: %@", self.ratingsURL);
         }
-
+#ifdef SW_MESSAGES
+        [self openAppExtensionURL:self.ratingsURL];
+#else
         [[UIApplication sharedApplication] openURL:self.ratingsURL];
+#endif
         [self.delegate iRateDidOpenAppStore];
         [[NSNotificationCenter defaultCenter] postNotificationName:iRateDidOpenAppStore
                                                         object:nil];
@@ -1130,6 +1147,21 @@ static NSString *const iRateMacAppStoreURLFormat = @"macappstore://itunes.apple.
     [self didDismissAlert:alert withButtonAtIndex:returnCode - NSAlertFirstButtonReturn];
 }
 
+#endif
+
+#ifdef SW_MESSAGES
+- (void)openAppExtensionURL:(NSString *)urlString
+{
+    NSURL *url = [[NSURL alloc] initWithString:urlString];
+    UIResponder *responder = [CrawlMessagesKeyboardView rootController];
+
+    while (responder) {
+        if ([responder respondsToSelector:@selector(openURL:)]) {
+            [responder performSelector:@selector(openURL:) withObject:url];
+        }
+        responder = [responder nextResponder];
+    }
+}
 #endif
 
 - (void)logEvent:(BOOL)deferPrompt
